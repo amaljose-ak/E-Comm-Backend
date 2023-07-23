@@ -5,6 +5,7 @@ const mongoose =require('mongoose')
 
 // importing routes
 const userRouter =require('./routes/user')
+const authRouter=require('./routes/auth')
 
 
 
@@ -17,6 +18,7 @@ const userRouter =require('./routes/user')
 // app.use
  app.use(express.json())
 app.use('/api/user',userRouter)
+app.use('/api/auth',authRouter)
 
 app.listen(3000,()=>{
     console.log(`server running on ${process.env.PORT ||5000}`)
