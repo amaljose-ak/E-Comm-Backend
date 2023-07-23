@@ -1,5 +1,80 @@
-const router=require('express').Router()
+const router = require('express').Router()
+const { verifyToken, verifyTokenAndAutherization, verifyTokenAdmin } = require('./verifyToken')
+const User = require('../model/user')
 
+// update user
+router.put("/:id", verifyTokenAndAutherization, async (req, res) => {
+  if (req.body.password) {
+    req.body.password = CryptoJS.AES.encrypt(req.body.password, process.env.PASS_SECR).toString();
+  }
+  try {
+    const { username } = req.body;
+    const existingUser = await User.findOne({ username });
 
+    if (existingUser && existingUser._id.toString() !== req.params.id) {
+      return res.status(409).json("Username is already taken.");
+    }
 
-module.exports=router
+    const updatedUser = await User.findByIdAndUpdate(req.params.id, { $set: req.body }, { new: true });
+    res.status(200).json(updatedUser);
+  } catch (e) {
+    res.status(500).json(e);
+  }
+});
+// delete user
+router.delete('/:id', verifyTokenAndAutherization, async (req, res) => {
+  try {
+    await User.findByIdAndDelete(req.params.id)
+    res.status(200).json('user has deleted')
+  } catch (er) {
+    res.status(500).json(er)
+  }
+})
+// find specific user
+router.get('/find/:id',verifyTokenAndAutherization,async(req,res)=>{
+  try {
+   const user= await User.findById(req.params.id)
+   const {password,...others} =user._doc
+   res.status(200).json(others)
+  } catch (e) {
+    res.status(500).json(e)
+  }
+})
+// see all users
+router.get('/find', verifyTokenAdmin, async (req, res) => {
+  const query = req.query.new
+  try {
+    const users = query
+      ? await User.find().sort({ _id: -1 }).limit(1) :
+      await User.find(req.params.id) 
+    res.status(200).json(users)
+  } catch (er) {
+    res.status(500).json(er)
+  }
+})
+// get users stats
+router.get('/stats', verifyTokenAdmin, async (req, res) => {
+  const date = new Date();
+  const lastYear = new Date(date.setFullYear(date.getFullYear() - 1))
+  try {
+    const data = await User.aggregate([
+      { $match: { createdAt: { $gte: lastYear } } },
+      {
+        $project: {
+          month: { $month: "$createdAt" },
+        },
+      },
+      {
+        $group: {
+          _id: "$month",
+          total: { $sum: 1 }
+        },
+      },
+    ])
+    res.status(200).json(data)
+  } catch (e) {
+    res.status(500).json(e)
+
+  }
+})
+module.exports = router
